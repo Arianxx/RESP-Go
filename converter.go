@@ -1,9 +1,13 @@
 package resp
 
+import "fmt"
+
 var (
 	errInteger      = &errProtocol{"failed to parse integer"}
 	errStringLength = &errProtocol{"failed to parse bulk string length"}
 	errStringEnding = &errProtocol{"failed to parse the string ending symbol"}
+	errArrayLength  = &errProtocol{"failed to parse array length"}
+	errArrayEnding  = &errProtocol{"failed to parse the array ending symbol"}
 )
 
 // errProtocol used to represents the error about incorrect data that does not conform to the protocol
@@ -179,6 +183,10 @@ func (b *BulkString) parseToGetLength(raw []byte) (*Command, error, []byte) {
 }
 
 func (b *BulkString) parseToGetString(raw []byte) (*Command, error, []byte) {
+	if len(raw) == 0 {
+		return nil, nil, raw
+	}
+
 	if b.length == -1 {
 		if len(raw) >= 2 && string(raw[:2]) == "\n\r" {
 			// &Command{nil, nil} means resp null
@@ -199,6 +207,7 @@ func (b *BulkString) parseToGetString(raw []byte) (*Command, error, []byte) {
 				return b.c, nil, raw[i+3:]
 			}
 		}
+		return nil, nil, []byte{}
 	}
 
 	return nil, errStringEnding, raw
@@ -222,11 +231,106 @@ func NewArrayConverter() Converter {
 }
 
 func (a *Array) Parse(raw []byte) (*Command, error, []byte) {
-	// TODO: array parse
 	return nil, nil, nil
 }
 
+func (b *Array) parseToGetLength(raw []byte) (*Command, error, []byte) {
+	for i, c := range raw {
+		if len(b.c.Raw) == 0 && i == 0 && c == arraySign {
+			continue
+		}
+
+		if c == '-' {
+			if (i == 0 && len(b.c.Raw) == 1) || (i == 1 && len(b.c.Raw) == 0) {
+				b.length = -1
+				continue
+			}
+		}
+
+		if c == '\r' {
+			if i+1 >= len(raw) || raw[i+1] != '\n' {
+				return nil, errArrayLength, raw
+			}
+			b.gotLength = true
+			b.c.Raw = append(b.c.Raw, raw[:i+2]...)
+			return b.Parse(raw[i+2:])
+		}
+
+		if c < '0' || c > '9' {
+			return nil, errArrayLength, raw
+		}
+
+		if b.length == -1 {
+			continue
+		}
+
+		b.length = 10*b.length + int(c) - '0'
+	}
+	b.c.Raw = append(b.c.Raw, raw...)
+	return nil, nil, []byte{}
+}
+
+func (b *Array) parseToGetString(raw []byte) (*Command, error, []byte) {
+	if len(raw) == 0 {
+		return nil, nil, raw
+	}
+
+	if b.length == -1 {
+		if len(raw) >= 2 && string(raw[:2]) == "\n\r" {
+			// &Command{nil, nil} means resp null
+			return &Command{nil, nil}, nil, raw[2:]
+		} else {
+			return nil, errArrayEnding, raw
+		}
+	} else if b.length > 0 {
+		if b.inner == nil {
+			if innerConverter, ok := converters[raw[0]]; !ok {
+				return nil, fmt.Errorf("unknown type symbol"), raw
+			} else {
+				b.inner = innerConverter()
+				return b.Parse(raw)
+			}
+		} else {
+			cmd, err, surplus := b.inner.Parse(raw)
+			if err != nil {
+				return nil, err, raw
+			}
+			if cmd != nil {
+				b.length--
+				b.c.Raw = append(b.c.Raw, cmd.Raw...)
+				b.c.Args = append(b.c.Args, b.c.Args[0])
+				b.inner = nil
+			}
+			return nil, nil, surplus
+		}
+	} else if b.length == 0 {
+		if b.c.Raw[len(b.c.Raw)-1] == '\n' {
+			if raw[0] == '\r' {
+				b.c.Raw = append(b.c.Raw, raw[0])
+				return b.c, nil, raw[1:]
+			} else {
+				return nil, errArrayEnding, raw
+			}
+		} else {
+			if len(raw) > 2 {
+				if string(raw[:2]) == "\n\r" {
+					b.c.Raw = append(b.c.Raw, raw[:2]...)
+					return b.c, nil, raw[2:]
+				} else {
+					return nil, errArrayEnding, raw
+				}
+			} else {
+				b.c.Raw = append(b.c.Raw, raw...)
+				return nil, nil, []byte{}
+			}
+		}
+	}
+
+	return nil, errStringEnding, raw
+}
+
 type ConverterConstructor func() Converter
+
 
 var converters = map[byte]ConverterConstructor{
 	simpleStringSign: NewSimpleStringConverter,
