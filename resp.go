@@ -1,6 +1,8 @@
 package resp
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Command represents a command parsed from the input bytes.
 type Command struct {
@@ -33,7 +35,7 @@ func (p *Parser) AppendRawData(in []byte) {
 }
 
 /* Parse parses the received data.
- * Return a slice of the Command pointers if there are some completed parsings, otherwise it remains nil.
+ * Return a Command pointers if there are some completed parsings, otherwise it remains nil.
  * Return a errProtocol if the error data has been detected.
  * If a err was be returned, then the parser will be unusable and should be replaced by a new Parser.
  */

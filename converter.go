@@ -40,9 +40,9 @@ func NewSimpleStringConverter() Converter {
 func (s *SimpleString) Parse(raw []byte) (cmd *Command, err error, surplus []byte) {
 	endIndex := -1
 	for i, c := range raw {
-		if c == '\r' {
-			if (i == 0 && len(s.c.Raw) != 0 && s.c.Raw[len(s.c.Raw)-1] == '\n') ||
-				raw[i-1] == '\n' {
+		if c == '\n' {
+			if (i == 0 && len(s.c.Raw) != 0 && s.c.Raw[len(s.c.Raw)-1] == '\r') ||
+				(i-1 >= 0 && raw[i-1] == '\r') {
 				endIndex = i
 			}
 			break
@@ -98,9 +98,9 @@ func (t *Integer) Parse(raw []byte) (*Command, error, []byte) {
 			continue
 		}
 
-		if c == '\n' {
+		if c == '\r' {
 			if i != len(raw)-1 {
-				if raw[i+1] != '\r' {
+				if raw[i+1] != '\n' {
 					return nil, errInteger, raw
 				} else {
 					endIndex = i + 1
@@ -109,9 +109,9 @@ func (t *Integer) Parse(raw []byte) (*Command, error, []byte) {
 			}
 		}
 
-		if c == '\r' {
-			if (i == 0 && len(t.c.Raw) != 0 && t.c.Raw[len(t.c.Raw)-1] == '\n') ||
-				raw[i-1] == '\n' {
+		if c == '\n' {
+			if (i == 0 && len(t.c.Raw) != 0 && t.c.Raw[len(t.c.Raw)-1] == '\r') ||
+				raw[i-1] == '\r' {
 				endIndex = i
 				break
 			} else {
@@ -173,9 +173,9 @@ func (b *BulkString) parseToGetLength(raw []byte) (*Command, error, []byte) {
 			}
 		}
 
-		if c == '\n' {
+		if c == '\r' {
 			if i != len(raw)-1 {
-				if raw[i+1] != '\r' {
+				if raw[i+1] != '\n' {
 					return nil, errInteger, raw
 				} else {
 					b.gotLength = true
@@ -188,9 +188,9 @@ func (b *BulkString) parseToGetLength(raw []byte) (*Command, error, []byte) {
 			}
 		}
 
-		if c == '\r' {
-			if (i == 0 && len(b.c.Raw) != 0 && b.c.Raw[len(b.c.Raw)-1] == '\n') ||
-				raw[i-1] == '\n' {
+		if c == '\n' {
+			if (i == 0 && len(b.c.Raw) != 0 && b.c.Raw[len(b.c.Raw)-1] == '\r') ||
+				raw[i-1] == '\r' {
 				b.gotLength = true
 				if b.length == -1 {
 					return b.Parse(raw[i:])
@@ -222,7 +222,7 @@ func (b *BulkString) parseToGetString(raw []byte) (*Command, error, []byte) {
 	}
 
 	if b.length == -1 {
-		if len(raw) >= 2 && string(raw[:2]) == "\n\r" {
+		if len(raw) >= 2 && string(raw[:2]) == "\r\n" {
 			return RespNil, nil, raw[2:]
 		} else {
 			return nil, errStringEnding, raw
@@ -234,7 +234,7 @@ func (b *BulkString) parseToGetString(raw []byte) (*Command, error, []byte) {
 
 			b.length--
 			if b.length == 0 {
-				if i+3 > len(raw) || string(raw[i+1:i+3]) != "\n\r" {
+				if i+3 > len(raw) || string(raw[i+1:i+3]) != "\r\n" {
 					return nil, errStringEnding, raw
 				}
 				return b.c, nil, raw[i+3:]
@@ -283,9 +283,9 @@ func (b *Array) parseToGetLength(raw []byte) (*Command, error, []byte) {
 			}
 		}
 
-		if c == '\n' {
+		if c == '\r' {
 			if i != len(raw)-1 {
-				if raw[i+1] != '\r' {
+				if raw[i+1] != '\n' {
 					return nil, errInteger, raw
 				} else {
 					b.gotLength = true
@@ -298,9 +298,9 @@ func (b *Array) parseToGetLength(raw []byte) (*Command, error, []byte) {
 			}
 		}
 
-		if c == '\r' {
-			if (i == 0 && len(b.c.Raw) != 0 && b.c.Raw[len(b.c.Raw)-1] == '\n') ||
-				raw[i-1] == '\n' {
+		if c == '\n' {
+			if (i == 0 && len(b.c.Raw) != 0 && b.c.Raw[len(b.c.Raw)-1] == '\r') ||
+				raw[i-1] == '\r' {
 				b.gotLength = true
 				if b.length == -1 {
 					return b.Parse(raw[i:])
@@ -332,7 +332,7 @@ func (b *Array) parseToGetString(raw []byte) (*Command, error, []byte) {
 	}
 
 	if b.length == -1 {
-		if len(raw) >= 2 && string(raw[:2]) == "\n\r" {
+		if len(raw) >= 2 && string(raw[:2]) == "\r\n" {
 			return RespNil, nil, raw[2:]
 		} else {
 			return nil, errArrayEnding, raw
@@ -359,8 +359,8 @@ func (b *Array) parseToGetString(raw []byte) (*Command, error, []byte) {
 			return b.Parse(surplus)
 		}
 	} else if b.length == 0 {
-		if b.c.Raw[len(b.c.Raw)-1] == '\n' {
-			if raw[0] == '\r' {
+		if b.c.Raw[len(b.c.Raw)-1] == '\r' {
+			if raw[0] == '\n' {
 				b.c.Raw = append(b.c.Raw, raw[0])
 				return b.c, nil, raw[1:]
 			} else {
@@ -368,7 +368,7 @@ func (b *Array) parseToGetString(raw []byte) (*Command, error, []byte) {
 			}
 		} else {
 			if len(raw) >= 2 {
-				if string(raw[:2]) == "\n\r" {
+				if string(raw[:2]) == "\r\n" {
 					b.c.Raw = append(b.c.Raw, raw[:2]...)
 					return b.c, nil, raw[2:]
 				} else {
