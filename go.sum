@@ -1,2 +1,6 @@
 github.com/arianxx/camellia-io v0.0.0-20190501085214-43af0c7ebc15 h1:2zjGIRYjDpvMuBHh4xruzipRno3yd0CTvpproO4T+Ok=
 github.com/arianxx/camellia-io v0.0.0-20190501085214-43af0c7ebc15/go.mod h1:p6/sBamBj5lNPKsCHC8Cq4fsvxuSnAx4hZsKehWnUoQ=
+github.com/arianxx/camellia-io v0.0.0-20190504123239-e1103c075600 h1:3E6VsCOlVccjUNfuW1QYLDxkALe9Z4k195fQOqqXgQY=
+github.com/arianxx/camellia-io v0.0.0-20190504123239-e1103c075600/go.mod h1:p6/sBamBj5lNPKsCHC8Cq4fsvxuSnAx4hZsKehWnUoQ=
+github.com/arianxx/camellia-io v0.0.0-20190504123534-f7825a295ca7 h1:ZW/ieC3qJAtBaUzzl4/jr026IOtlEwqUXefJNVkSj3k=
+github.com/arianxx/camellia-io v0.0.0-20190504123534-f7825a295ca7/go.mod h1:p6/sBamBj5lNPKsCHC8Cq4fsvxuSnAx4hZsKehWnUoQ=
