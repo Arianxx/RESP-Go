@@ -18,7 +18,7 @@ func TestSimpleString_Parse_uncompleted(t *testing.T) {
 }
 
 func TestSimpleString_Parse_successful(t *testing.T) {
-	raw := []byte("+test\r\n")
+	raw := []byte("+test\n")
 	s := NewSimpleString()
 	expectedCmd := &Command{
 		Raw:  raw,
@@ -38,7 +38,7 @@ func TestSimpleString_Parse_successful(t *testing.T) {
 }
 
 func TestInteger_Parse(t *testing.T) {
-	raw := []byte(":1000\r\n")
+	raw := []byte(":1000\n")
 	s := NewInteger()
 	cmd, err, surplus := s.Parse(raw)
 	if len(surplus) != 0 {
@@ -56,7 +56,7 @@ func TestInteger_Parse2(t *testing.T) {
 	raw := []byte(":100")
 	s := NewInteger()
 	_, _, _ = s.Parse(raw)
-	raw = []byte("0\r\n")
+	raw = []byte("0\n")
 	cmd, err, surplus := s.Parse(raw)
 	if len(surplus) != 0 {
 		t.Fatal("expected 0, got ", string(surplus))
@@ -70,7 +70,7 @@ func TestInteger_Parse2(t *testing.T) {
 }
 
 func TestBulkString_Parse(t *testing.T) {
-	raw := []byte("$6\r\ntesthh\r\n")
+	raw := []byte("$6\ntesthh\n")
 	s := NewBulkString()
 	cmd, err, surplus := s.Parse(raw)
 	if len(surplus) != 0 {
@@ -85,10 +85,10 @@ func TestBulkString_Parse(t *testing.T) {
 }
 
 func TestBulkString_Parse2(t *testing.T) {
-	raw := []byte("$6\r\ntest")
+	raw := []byte("$6\ntest")
 	s := NewBulkString()
 	_, _, _ = s.Parse(raw)
-	raw = []byte("hh\r\n")
+	raw = []byte("hh\n")
 	cmd, err, surplus := s.Parse(raw)
 	if len(surplus) != 0 {
 		t.Fatal("expected 0, got ", string(surplus))
@@ -102,19 +102,19 @@ func TestBulkString_Parse2(t *testing.T) {
 }
 
 func TestArray_Parse(t *testing.T) {
-	raw := []byte("*-1\r\n")
+	raw := []byte("*-1\n")
 	s := NewArray()
 	cmd, err, _ := s.Parse(raw)
 	if err != nil {
 		t.Fatal("expected", nil, "got", err)
 	}
-	if cmd != RespNil {
-		t.Fatal("expected", RespNil, "got", cmd)
+	if cmd != Nil {
+		t.Fatal("expected", Nil, "got", cmd)
 	}
 }
 
 func TestArray_Parse2(t *testing.T) {
-	raw := []byte("*2\r\n+test\r\n:1000\r\n\r\n")
+	raw := []byte("*2\n+test\n:1000\n\n")
 	s := NewArray()
 	cmd, err, surplus := s.Parse(raw)
 	if err != nil {

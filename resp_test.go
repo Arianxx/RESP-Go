@@ -76,7 +76,7 @@ func TestParser_Parse_successful(t *testing.T) {
 	if cmd != nil || err != nil {
 		t.Fatal("expected nil, got ", cmd, err)
 	}
-	p.AppendRawData([]byte("\r\n"))
+	p.AppendRawData([]byte("\n"))
 	cmd, err = p.Parse()
 	if err != nil {
 		t.Fatal("expected nil error but got: ", err)
