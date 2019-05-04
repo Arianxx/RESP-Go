@@ -30,7 +30,7 @@ type SimpleString struct {
 var simpleStringSign = byte('+')
 
 func NewSimpleString() *SimpleString {
-	return &SimpleString{NewCommand()}
+	return &SimpleString{NewCommand("simpleString")}
 }
 
 func NewSimpleStringConverter() Converter {
@@ -41,10 +41,7 @@ func (s *SimpleString) Parse(raw []byte) (cmd *Command, err error, surplus []byt
 	endIndex := -1
 	for i, c := range raw {
 		if c == '\n' {
-			if (i == 0 && len(s.c.Raw) != 0 && s.c.Raw[len(s.c.Raw)-1] == '\r') ||
-				(i-1 >= 0 && raw[i-1] == '\r') {
-				endIndex = i
-			}
+			endIndex = i
 			break
 		}
 	}
@@ -54,7 +51,7 @@ func (s *SimpleString) Parse(raw []byte) (cmd *Command, err error, surplus []byt
 	}
 
 	s.c.Raw = append(s.c.Raw, raw[:endIndex+1]...)
-	s.c.Args = append(s.c.Args, s.c.Raw[1:len(s.c.Raw)-2])
+	s.c.Args = append(s.c.Args, s.c.Raw[1:len(s.c.Raw)-1])
 	return s.c, nil, raw[endIndex+1:]
 }
 
@@ -65,7 +62,9 @@ type RespError struct {
 var respErrorSign = byte('-')
 
 func NewRespError() *RespError {
-	return &RespError{*NewSimpleString()}
+	r := &RespError{*NewSimpleString()}
+	r.c.Type = "error"
+	return r
 }
 
 func NewRespErrorConverter() Converter {
@@ -79,7 +78,7 @@ type Integer struct {
 var integerSign = byte(':')
 
 func NewInteger() *Integer {
-	return &Integer{NewCommand()}
+	return &Integer{NewCommand("integer")}
 }
 
 func NewIntegerConverter() Converter {
@@ -98,25 +97,9 @@ func (t *Integer) Parse(raw []byte) (*Command, error, []byte) {
 			continue
 		}
 
-		if c == '\r' {
-			if i != len(raw)-1 {
-				if raw[i+1] != '\n' {
-					return nil, errInteger, raw
-				} else {
-					endIndex = i + 1
-					break
-				}
-			}
-		}
-
 		if c == '\n' {
-			if (i == 0 && len(t.c.Raw) != 0 && t.c.Raw[len(t.c.Raw)-1] == '\r') ||
-				raw[i-1] == '\r' {
-				endIndex = i
-				break
-			} else {
-				return nil, errInteger, raw
-			}
+			endIndex = i
+			break
 		}
 
 		if c < '0' || c > '9' {
@@ -130,7 +113,7 @@ func (t *Integer) Parse(raw []byte) (*Command, error, []byte) {
 	}
 
 	t.c.Raw = append(t.c.Raw, raw[:endIndex+1]...)
-	t.c.Args = append(t.c.Args, t.c.Raw[1:len(t.c.Raw)-2])
+	t.c.Args = append(t.c.Args, t.c.Raw[1:len(t.c.Raw)-1])
 	return t.c, nil, raw[endIndex+1:]
 }
 
@@ -143,7 +126,7 @@ type BulkString struct {
 var bulkStringSign = byte('$')
 
 func NewBulkString() *BulkString {
-	b := BulkString{0, false, NewCommand()}
+	b := BulkString{0, false, NewCommand("bulkString")}
 	b.c.Args = append(b.c.Args, []byte{})
 	return &b
 }
@@ -173,33 +156,13 @@ func (b *BulkString) parseToGetLength(raw []byte) (*Command, error, []byte) {
 			}
 		}
 
-		if c == '\r' {
-			if i != len(raw)-1 {
-				if raw[i+1] != '\n' {
-					return nil, errInteger, raw
-				} else {
-					b.gotLength = true
-					if b.length == -1 {
-						return b.Parse(raw[i:])
-					}
-					b.c.Raw = append(b.c.Raw, raw[:i+2]...)
-					return b.Parse(raw[i+2:])
-				}
-			}
-		}
-
 		if c == '\n' {
-			if (i == 0 && len(b.c.Raw) != 0 && b.c.Raw[len(b.c.Raw)-1] == '\r') ||
-				raw[i-1] == '\r' {
-				b.gotLength = true
-				if b.length == -1 {
-					return b.Parse(raw[i:])
-				}
-				b.c.Raw = append(b.c.Raw, raw[:i+1]...)
-				return b.Parse(raw[i+1:])
-			} else {
-				return nil, errStringLength, raw
+			b.gotLength = true
+			if b.length == -1 {
+				return b.Parse(raw[i:])
 			}
+			b.c.Raw = append(b.c.Raw, raw[:i+1]...)
+			return b.Parse(raw[i+1:])
 		}
 
 		if c < '0' || c > '9' {
@@ -222,8 +185,8 @@ func (b *BulkString) parseToGetString(raw []byte) (*Command, error, []byte) {
 	}
 
 	if b.length == -1 {
-		if len(raw) >= 2 && string(raw[:2]) == "\r\n" {
-			return RespNil, nil, raw[2:]
+		if len(raw) >= 1 && string(raw[:1]) == "\n" {
+			return Nil, nil, raw[1:]
 		} else {
 			return nil, errStringEnding, raw
 		}
@@ -234,10 +197,10 @@ func (b *BulkString) parseToGetString(raw []byte) (*Command, error, []byte) {
 
 			b.length--
 			if b.length == 0 {
-				if i+3 > len(raw) || string(raw[i+1:i+3]) != "\r\n" {
+				if i+2 > len(raw) || string(raw[i+1:i+2]) != "\n" {
 					return nil, errStringEnding, raw
 				}
-				return b.c, nil, raw[i+3:]
+				return b.c, nil, raw[i+2:]
 			}
 		}
 		return nil, nil, []byte{}
@@ -256,7 +219,7 @@ type Array struct {
 var arraySign = byte('*')
 
 func NewArray() *Array {
-	return &Array{0, false, nil, NewCommand()}
+	return &Array{0, false, nil, NewCommand("array")}
 }
 
 func NewArrayConverter() Converter {
@@ -283,33 +246,13 @@ func (b *Array) parseToGetLength(raw []byte) (*Command, error, []byte) {
 			}
 		}
 
-		if c == '\r' {
-			if i != len(raw)-1 {
-				if raw[i+1] != '\n' {
-					return nil, errInteger, raw
-				} else {
-					b.gotLength = true
-					if b.length == -1 {
-						return b.Parse(raw[i:])
-					}
-					b.c.Raw = append(b.c.Raw, raw[:i+2]...)
-					return b.Parse(raw[i+2:])
-				}
-			}
-		}
-
 		if c == '\n' {
-			if (i == 0 && len(b.c.Raw) != 0 && b.c.Raw[len(b.c.Raw)-1] == '\r') ||
-				raw[i-1] == '\r' {
-				b.gotLength = true
-				if b.length == -1 {
-					return b.Parse(raw[i:])
-				}
-				b.c.Raw = append(b.c.Raw, raw[:i+1]...)
-				return b.Parse(raw[i+1:])
-			} else {
-				return nil, errStringLength, raw
+			b.gotLength = true
+			if b.length == -1 {
+				return b.Parse(raw[i:])
 			}
+			b.c.Raw = append(b.c.Raw, raw[:i+1]...)
+			return b.Parse(raw[i+1:])
 		}
 
 		if c < '0' || c > '9' {
@@ -332,8 +275,8 @@ func (b *Array) parseToGetString(raw []byte) (*Command, error, []byte) {
 	}
 
 	if b.length == -1 {
-		if len(raw) >= 2 && string(raw[:2]) == "\r\n" {
-			return RespNil, nil, raw[2:]
+		if len(raw) >= 1 && string(raw[:1]) == "\n" {
+			return Nil, nil, raw[1:]
 		} else {
 			return nil, errArrayEnding, raw
 		}
@@ -359,25 +302,11 @@ func (b *Array) parseToGetString(raw []byte) (*Command, error, []byte) {
 			return b.Parse(surplus)
 		}
 	} else if b.length == 0 {
-		if b.c.Raw[len(b.c.Raw)-1] == '\r' {
-			if raw[0] == '\n' {
-				b.c.Raw = append(b.c.Raw, raw[0])
-				return b.c, nil, raw[1:]
-			} else {
-				return nil, errArrayEnding, raw
-			}
+		if string(raw[:1]) == "\n" {
+			b.c.Raw = append(b.c.Raw, raw[:1]...)
+			return b.c, nil, raw[1:]
 		} else {
-			if len(raw) >= 2 {
-				if string(raw[:2]) == "\r\n" {
-					b.c.Raw = append(b.c.Raw, raw[:2]...)
-					return b.c, nil, raw[2:]
-				} else {
-					return nil, errArrayEnding, raw
-				}
-			} else {
-				b.c.Raw = append(b.c.Raw, raw...)
-				return nil, nil, []byte{}
-			}
+			return nil, errArrayEnding, raw
 		}
 	}
 
@@ -394,4 +323,4 @@ var converters = map[byte]ConverterConstructor{
 	arraySign:        NewArrayConverter,
 }
 
-var RespNil = &Command{}
+var Nil = &Command{}

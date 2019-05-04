@@ -2,6 +2,8 @@ package resp
 
 import (
 	"fmt"
+	"github.com/arianxx/camellia-io"
+	"log"
 )
 
 // Command represents a command parsed from the input bytes.
@@ -10,10 +12,11 @@ type Command struct {
 	Raw []byte
 	// Args is the a series of arguments that make up the command.
 	Args [][]byte
+	Type string
 }
 
-func NewCommand() *Command {
-	return &Command{[]byte{}, [][]byte{}}
+func NewCommand(t string) *Command {
+	return &Command{[]byte{}, [][]byte{}, t}
 }
 
 // Parser tries to parse the input bytes to a series of Command.
@@ -74,3 +77,57 @@ func (p *Parser) Parse() (cmd *Command, err error) {
 
 	return
 }
+
+type Server struct {
+	*camellia.Server
+	proc CommandProc
+
+	Event *camellia.Event
+}
+
+func NewServer(net, addr string, f CommandProc) (*Server, error) {
+	s := &Server{camellia.NewServer(), f, nil}
+	lis, err := camellia.NewListener(net, addr, s.El)
+	if err != nil {
+		return nil, err
+	}
+	s.AddListener(lis)
+	s.Event = &camellia.Event{Data: s.loopProc}
+	s.AddEvent(s.Event)
+	return s, nil
+}
+
+func (s *Server) StartServe() error {
+	if s.proc == nil {
+		log.Fatal("empty proc")
+	}
+
+	return s.Server.StartServe()
+}
+
+func (s *Server) loopProc(el *camellia.EventLoop, connPtr *interface{}) {
+	conn := (*connPtr).(*camellia.Conn)
+	parserInterface := conn.GetContext()
+	if parserInterface == nil {
+		parserInterface = NewParser()
+		conn.SetContext(parserInterface)
+	}
+	parser := parserInterface.(*Parser)
+
+	parser.AppendRawData(conn.Read())
+	cmd, err := parser.Parse()
+	if err != nil {
+		conn.SetContext(NewParser())
+		conn.Write(AppendError([]byte{}, []byte(err.Error())))
+		return
+	}
+
+	if cmd != nil {
+		res := &[]byte{}
+		s.proc(cmd, conn, res)
+		conn.Write(*res)
+		return
+	}
+}
+
+type CommandProc func(cmd *Command, conn *camellia.Conn, res *[]byte)

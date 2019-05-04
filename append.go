@@ -5,7 +5,7 @@ import "strconv"
 func appendPredix(b []byte, c byte, n int) []byte {
 	b = append(b, c)
 	b = strconv.AppendInt(b, int64(n), 10)
-	return append(b, '\r', '\n')
+	return append(b, '\n')
 }
 
 func appendBulkLength(b []byte, n int) []byte {
@@ -17,7 +17,7 @@ func appendArrayLength(b []byte, n int) []byte {
 }
 
 func appendLineEnding(b []byte) []byte {
-	return append(b, '\r', '\n')
+	return append(b, '\n')
 }
 
 func AppendSimpleString(b, c []byte) []byte {
